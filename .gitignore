@@ -87,3 +87,6 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# Cloudflare config file
+cloudflare-dynamic-dns.json
