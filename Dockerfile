@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:24.04
 
 RUN apt update -y && \
     apt install python3 python3-requests --no-install-recommends -y && \
