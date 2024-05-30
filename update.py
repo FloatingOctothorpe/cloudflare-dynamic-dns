@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-"""Update a Cloudflare DNS entry to point at your current public IP"""
+"""Update CloudFlare DNS entries to point at your current public IP"""
 
+import argparse
 import json
 import logging
 import os
@@ -11,8 +12,6 @@ import sys
 
 import requests
 
-
-CONFIG_FILE = 'cloudflare-dynamic-dns.json'
 
 def get_public_ip():
     """Return your current public IP address"""
@@ -90,9 +89,8 @@ def save_config(config, path):
     except IOError:
         logging.error('Failed to create: %s', path)
 
-def get_config():
+def get_config(config_path):
     """Load or prompt for configuration"""
-    config_path = os.path.join(os.path.dirname(sys.argv[0]), CONFIG_FILE)
     try:
         with open(config_path, 'r', encoding='utf-8') as config_data:
             config = json.load(config_data)
@@ -103,35 +101,60 @@ def get_config():
         save_config(config, config_path)
     return config
 
-def main():
-    """Update DNS A record based on current public IP address"""
-    config = get_config()
-    public_ip = get_public_ip()
-    logging.debug('Public ip is: %s', public_ip)
-    current_ip = socket.gethostbyname(config['record'])
-    logging.debug('%s currently points to %s', config['record'], current_ip)
-    if current_ip == public_ip:
-        logging.info('%s already points to %s, nothing to do', config['record'], public_ip)
+
+def check_and_update(target_ip, record, zone, token):
+    """Check and if required update a CloudFlare A record"""
+    current_ip = socket.gethostbyname(record)
+    logging.debug('%s currently points to %s', record, current_ip)
+    if current_ip == target_ip:
+        logging.info('%s already points to %s, nothing to do', record, target_ip)
         return
 
-    logging.debug('Fetching Zone ID for %s', config['zone'])
-    zone_id = get_zone_id(config['token'], config['zone'])
+    logging.debug('Fetching Zone ID for %s', zone)
+    zone_id = get_zone_id(token, zone)
     logging.debug('Zone ID: %s', zone_id)
-    logging.debug('Fetching record details for %s', config['record'])
-    record = get_a_record_details(config['token'], zone_id, config['record'])
-    logging.debug('Record ID: %s', record['id'])
-    del record['created_on']
-    del record['modified_on']
-    record['content'] = public_ip
-    logging.debug('Updating %s to point to %s', config['record'], public_ip)
-    if update_record(config['token'], record):
-        logging.info('Updated %s (%s)', config['record'], public_ip)
+    logging.debug('Fetching record details for %s', record)
+    record_details = get_a_record_details(token, zone_id, record)
+    logging.debug('Record ID: %s', record_details['id'])
+    del record_details['created_on']
+    del record_details['modified_on']
+    record_details['content'] = target_ip
+    logging.debug('Updating %s to point to %s', record, target_ip)
+    if update_record(token, record_details):
+        logging.info('Updated %s (%s)', record, target_ip)
     else:
-        logging.warning('Failed to update %s', config['record'])
+        logging.warning('Failed to update %s', record)
 
-if __name__ == '__main__':
+
+def do_updates(config):
+    """Update DNS A record(s) based on current public IP address"""
+    public_ip = get_public_ip()
+    logging.debug('Public ip is: %s', public_ip)
+
+    if 'records' in config:
+        for entry in config['records']:
+            check_and_update(public_ip, entry['record'], entry['zone'], config['token'])
+    else:
+        check_and_update(public_ip, config['record'], config['zone'], config['token'])
+
+
+def main():
+    """Parse args and do check/update"""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
+    parser.add_argument('--config', dest='config', action='store', type=str,
+                        default='cloudflare-dynamic-dns.json',
+                        help='Config file with token and target record info')
+    args = parser.parse_args()
+
+    log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(
             format='%(asctime)s %(levelname)s: %(message)s',
             datefmt='%Y-%m-%d %H:%M:%S',
-            level=logging.INFO)
+            level=log_level)
+
+    config = get_config(args.config)
+    do_updates(config)
+
+if __name__ == '__main__':
     main()
