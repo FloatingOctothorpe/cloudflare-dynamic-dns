@@ -19,11 +19,11 @@ def get_public_ip():
     response.raise_for_status()
     return response.text.strip()
 
-def update_record(token, record):
+def update_record(token, zone_id, record):
     """Update a DNS record"""
 
     response = requests.put(
-        f'https://api.cloudflare.com/client/v4/zones/{record["zone_id"]}/dns_records/{record["id"]}',
+        f'https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records/{record["id"]}',
         headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'},
         data=json.dumps(record),
         timeout=15
@@ -120,7 +120,7 @@ def check_and_update(target_ip, record, zone, token):
     del record_details['modified_on']
     record_details['content'] = target_ip
     logging.debug('Updating %s to point to %s', record, target_ip)
-    if update_record(token, record_details):
+    if update_record(token, zone_id, record_details):
         logging.info('Updated %s (%s)', record, target_ip)
     else:
         logging.warning('Failed to update %s', record)
