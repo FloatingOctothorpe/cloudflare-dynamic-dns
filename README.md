@@ -19,7 +19,7 @@ Python script to use Cloudflare for dynamic DNS
     Zone name: example.com
     A record name: updateme.example.com
     INFO:root:Saving new config to cloudflare-dynamic-dns.json
-    INFO:root:Updated updateme.example.com.uk (1.2.3.4)
+    INFO:root:Updated updateme.example.com (1.2.3.4)
     ```
 
  4. Periodically re-run the script (e.g. via cron) to keep the A record
